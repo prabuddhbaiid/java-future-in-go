@@ -27,6 +27,9 @@ func createFutureTask(f func() result) *futureTask {
 		//channel waiting for a result
 		futureObjChannel <- f()
 
+		//close channel
+		defer close(futureObjChannel)
+
 		//if get() or getWithTimeout() has not been called on the futureObject
 		//take the result from future channel
 		//update attributes
@@ -35,7 +38,6 @@ func createFutureTask(f func() result) *futureTask {
 			futureObj.result = <-futureObjChannel
 			futureObj.running = false
 			futureObj.done = true
-			defer close(futureObjChannel)
 		}
 	}()
 
@@ -58,17 +60,17 @@ func (futureTask *futureTask) cancel(b bool) bool {
 		return false
 
 	//if future is done/has returned an error, i.e. cancelled or timed out
-	case futureTask.done || futureTask.cancelled || !futureTask.running:
+	case futureTask.done:
 		return false
 
 	//if future is running, then cancel, send a nil result and an error message that it has been cancelled
 	case futureTask.running:
 		futureTask.cancelled = true
 		futureTask.result = result{res: nil, myError: myError{"cancelled"}}
-		defer func() {
-			futureTask.running = false
-			futureTask.channel <- futureTask.result
-		}()
+		futureTask.running = false
+		futureTask.done = true
+		futureTask.channel <- futureTask.result
+
 		return true
 	}
 	return false
@@ -77,46 +79,38 @@ func (futureTask *futureTask) cancel(b bool) bool {
 func (futureTask *futureTask) get() result {
 
 	//if task is cancelled/done/has returned an error...return the result immediately
-	if futureTask.cancelled || futureTask.done || !futureTask.running {
+	if futureTask.done {
 		return futureTask.result
 	}
 
 	//wait till task in future has been accomplished
-	//update attributes, check for error
-	//close channel
+	//update attributes
 	select {
 	case futureTask.result = <-futureTask.channel:
-
-		if futureTask.result.myError.message == "" {
-			futureTask.done = true
-		}
+		futureTask.done = true
 		futureTask.running = false
-		defer close(futureTask.channel)
+
 		return futureTask.result
 	}
 }
 
 func (futureTask *futureTask) getWithTimeout(timeout int) result {
 
-	if futureTask.cancelled || futureTask.done || !futureTask.running {
+	if futureTask.done {
 		return futureTask.result
 	}
 
 	//wait for race between task in future and timeout
 	//update attributes
-	//close channel
 	select {
 	case futureTask.result = <-futureTask.channel:
 
-		//check for an error
-		if futureTask.result.myError.message == "" {
-			futureTask.done = true
-		}
 	case <-time.After(time.Duration(time.Second * time.Duration(timeout))):
 		<-futureTask.channel
 		futureTask.result = result{res: nil, myError: myError{"timeout"}}
 	}
-	defer close(futureTask.channel)
+
 	futureTask.running = false
+	futureTask.done = true
 	return futureTask.result
 }

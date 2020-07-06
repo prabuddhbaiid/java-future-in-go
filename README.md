@@ -17,6 +17,15 @@ When a futureTask is created
   * We can cancel a future by calling cancel(true) method
   * We can check if a future is completed by calling isDone() method
   * We can check if a future has been cancelled by calling isCancelled() method
+
+EDIT -  
+1. Updated with correct definition of Done i.e. completion is achieved if task is  
+  * Completed  
+  * Cancelled  
+  * Returns an Error  
+
+2. Change of close channel, now channel is only closed in "constructor"
+    
   
 The following cases have been executed:  
 In each case (except 5), a simple int of 15 has been passed as the result of every computation (futureTask)  
@@ -31,8 +40,8 @@ Cancelled: false
 case 2 - cancel a future in between, returns "cancelled" as error  
 Expected Output -  
 Cancelled: true  
-Done: false  
-Result: {<nil> {cancelled}}  
+Done: true  
+Result: {<"nil"> {cancelled}}  
 
 case 3 - simple getWithTimeOut()  
 Expected Output -   
@@ -41,13 +50,13 @@ Result: {15 {}}
 
 case 4 - timeout error  
 Expected Output -  
-Done: false  
-Result: {<nil> {timeout}}  
+Done: true  
+Result: {<"nil"> {timeout}}  
 
 case 5 - future returns a failure  
 Expected Output -   
-Done: false  
-Result: {<nil> {future failed}}  
+Done: true  
+Result: {<"nil"> {future failed}}  
 
 case 6 - wait for result  
 Expected Output -  
