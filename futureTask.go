@@ -5,7 +5,6 @@ import "time"
 type futureTask struct {
 	result    result
 	done      bool
-	running   bool
 	cancelled bool
 	channel   chan result
 }
@@ -16,11 +15,8 @@ func createFutureTask(f func() result) *futureTask {
 
 	//reference to future object
 	futureObj := &futureTask{
-		result:    result{},
-		done:      false,
-		running:   true,
-		cancelled: false,
-		channel:   futureObjChannel}
+		result:  result{},
+		channel: futureObjChannel}
 
 	//initilizing the future task in a new thread
 	go func() {
@@ -31,12 +27,12 @@ func createFutureTask(f func() result) *futureTask {
 		defer close(futureObjChannel)
 
 		//if get() or getWithTimeout() has not been called on the futureObject
+		//or timeout has occured and channel has a value
 		//take the result from future channel
 		//update attributes
 		//close channel
 		if len(futureObjChannel) > 0 {
 			futureObj.result = <-futureObjChannel
-			futureObj.running = false
 			futureObj.done = true
 		}
 	}()
@@ -64,11 +60,9 @@ func (futureTask *futureTask) cancel(b bool) bool {
 		return false
 
 	//if future is running, then cancel, send a nil result and an error message that it has been cancelled
-	case futureTask.running:
-		futureTask.cancelled = true
+	case !futureTask.done:
+		futureTask.cancelled, futureTask.done = true, true
 		futureTask.result = result{res: nil, myError: myError{"cancelled"}}
-		futureTask.running = false
-		futureTask.done = true
 		futureTask.channel <- futureTask.result
 
 		return true
@@ -88,8 +82,6 @@ func (futureTask *futureTask) get() result {
 	select {
 	case futureTask.result = <-futureTask.channel:
 		futureTask.done = true
-		futureTask.running = false
-
 		return futureTask.result
 	}
 }
@@ -106,11 +98,9 @@ func (futureTask *futureTask) getWithTimeout(timeout int) result {
 	case futureTask.result = <-futureTask.channel:
 
 	case <-time.After(time.Duration(time.Second * time.Duration(timeout))):
-		<-futureTask.channel
 		futureTask.result = result{res: nil, myError: myError{"timeout"}}
 	}
 
-	futureTask.running = false
 	futureTask.done = true
 	return futureTask.result
 }
