@@ -30,7 +30,6 @@ func createFutureTask(f func() result) *futureTask {
 		//or timeout has occured and channel has a value
 		//take the result from future channel
 		//update attributes
-		//close channel
 		if len(futureObjChannel) > 0 {
 			futureObj.result = <-futureObjChannel
 			futureObj.done = true
