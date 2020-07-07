@@ -6,7 +6,7 @@ type futureTask struct {
 	result    result
 	done      bool
 	cancelled bool
-	channel   chan result
+	channel   <-chan result
 }
 
 func createFutureTask(f func() result) *futureTask {
@@ -27,10 +27,9 @@ func createFutureTask(f func() result) *futureTask {
 		defer close(futureObjChannel)
 
 		//if get() or getWithTimeout() has not been called on the futureObject
-		//or timeout has occured and channel has a value
 		//take the result from future channel
 		//update attributes
-		if len(futureObjChannel) > 0 {
+		if len(futureObjChannel) > 0 && !futureObj.isDone() {
 			futureObj.result = <-futureObjChannel
 			futureObj.done = true
 		}
@@ -62,8 +61,6 @@ func (futureTask *futureTask) cancel(b bool) bool {
 	case !futureTask.done:
 		futureTask.cancelled, futureTask.done = true, true
 		futureTask.result = result{res: nil, myError: myError{"cancelled"}}
-		futureTask.channel <- futureTask.result
-
 		return true
 	}
 	return false
@@ -99,7 +96,6 @@ func (futureTask *futureTask) getWithTimeout(timeout int) result {
 	case <-time.After(time.Duration(time.Second * time.Duration(timeout))):
 		futureTask.result = result{res: nil, myError: myError{"timeout"}}
 	}
-
 	futureTask.done = true
 	return futureTask.result
 }
